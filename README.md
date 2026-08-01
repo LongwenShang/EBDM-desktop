@@ -1,24 +1,24 @@
-# EBDM Desktop
+# 💻 EBDM Desktop
 
 A lightweight macOS desktop prototype for estimating joint distributions from study-level marginal summaries.
 
 The application translates methods from the EBDM research project into a standalone Python/Qt interface. R is not required at runtime.
 
-## Download
+## ⏬ Download
 
 [**Download EBDM Desktop for macOS — Apple Silicon**](https://github.com/LongwenShang/EBDM-desktop/releases/latest/download/EBDM-Desktop-macOS-arm64.dmg)
 
 ## Screenshots
 
-### Binary–Binary
+### 1️⃣ Binary–Binary
 
 ![Binary–Binary module](assets/screenshots/binary_binary.png)
 
-### Continuous–Continuous
+### 2️⃣ Continuous–Continuous
 
 ![Continuous–Continuous module](assets/screenshots/continuous_continuous.png)
 
-### Binary–Continuous
+### 3️⃣ Binary–Continuous
 
 ![Binary–Continuous module](assets/screenshots/binary_continuous.png)
 
@@ -42,7 +42,7 @@ The application translates methods from the EBDM research project into a standal
 - Naive likelihood estimator
 - Reports group-specific means and standard deviations, standard errors, confidence intervals, convergence status, and objective value
 
-## Interface
+## 🖥️ Interface
 
 - Editable study-level summary tables
 - Built-in example datasets
@@ -51,7 +51,7 @@ The application translates methods from the EBDM research project into a standal
 - Scrollable layouts for smaller windows
 - Warning for potentially unstable boundary estimates
 
-## Technology
+## 🔧 Technology
 
 - Python 3.11
 - PySide6 / Qt
@@ -62,7 +62,7 @@ The application translates methods from the EBDM research project into a standal
 
 The statistical methods were originally developed in R and independently implemented in Python for this desktop prototype.
 
-## Run from source
+## 📖 Run from source
 
 ```bash
 python3 -m venv .venv
@@ -71,7 +71,7 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-## Project structure
+## 🗼 Project structure
 
 ```text
 ebdm-desktop/
@@ -91,12 +91,12 @@ ebdm-desktop/
 └── README.md
 ```
 
-## Development status
+## 👣 Development status
 
 This is a functional research-software prototype rather than a production release.
 
 Planned extensions include CSV/Excel import, result export, automated reports, additional diagnostics, Windows packaging, and macOS code signing and notarization.
 
-## Background
+## 🧑‍🎓 Background
 
 EBDM reconstructs joint distributions from marginal summary statistics when individual-level data are unavailable. Potential applications include clinical-trial simulation, feasibility evaluation, and secondary analysis under data-access or privacy constraints.
