@@ -1,0 +1,504 @@
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QStyledItemDelegate,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ebdm_app.estimators.binary_binary import estimate_binary_binary
+
+
+
+class CenteredItemDelegate(QStyledItemDelegate):
+    """Center table values in both display and editing modes."""
+
+    def initStyleOption(self, option, index) -> None:
+        super().initStyleOption(option, index)
+        option.displayAlignment = Qt.AlignmentFlag.AlignCenter
+
+    def createEditor(self, parent, option, index):
+        editor = super().createEditor(parent, option, index)
+
+        if hasattr(editor, "setAlignment"):
+            editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        return editor
+
+
+class BinaryBinaryPage(QWidget):
+    """Data-entry page for the binary–binary estimation method."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._build_interface()
+        self._apply_styles()
+        self._load_example()
+
+    def _build_interface(self) -> None:
+        page_layout = QVBoxLayout(self)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName("bbScrollArea")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+        content_widget = QWidget()
+        content_widget.setObjectName("bbScrollContent")
+
+        outer_layout = QVBoxLayout(content_widget)
+        outer_layout.setContentsMargins(46, 38, 46, 38)
+        outer_layout.setSpacing(20)
+        outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        title = QLabel("Binary–Binary")
+        title.setObjectName("bbPageTitle")
+
+        description = QLabel(
+            "Estimate the joint distribution of two binary variables "
+            "from marginal study-level summaries."
+        )
+        description.setObjectName("bbPageDescription")
+        description.setWordWrap(True)
+
+        outer_layout.addWidget(title)
+        outer_layout.addWidget(description)
+
+        # Input card
+        input_card = QFrame()
+        input_card.setObjectName("bbCard")
+
+        input_layout = QVBoxLayout(input_card)
+        input_layout.setContentsMargins(26, 24, 26, 24)
+        input_layout.setSpacing(16)
+
+        card_header = QHBoxLayout()
+
+        header_text = QVBoxLayout()
+        header_text.setSpacing(3)
+
+        card_title = QLabel("Study-level summaries")
+        card_title.setObjectName("bbCardTitle")
+
+        card_subtitle = QLabel(
+            "Enter one study per row. Counts must satisfy 0 ≤ xᵢ, yᵢ ≤ nᵢ."
+        )
+        card_subtitle.setObjectName("bbMutedText")
+
+        header_text.addWidget(card_title)
+        header_text.addWidget(card_subtitle)
+
+        card_header.addLayout(header_text)
+        card_header.addStretch()
+
+        example_button = QPushButton("Load example")
+        example_button.setObjectName("bbSecondaryButton")
+        example_button.clicked.connect(self._load_example)
+
+        add_button = QPushButton("Add row")
+        add_button.setObjectName("bbSecondaryButton")
+        add_button.clicked.connect(self._add_row)
+
+        remove_button = QPushButton("Remove selected")
+        remove_button.setObjectName("bbSecondaryButton")
+        remove_button.clicked.connect(self._remove_selected_rows)
+
+        card_header.addWidget(example_button)
+        card_header.addWidget(add_button)
+        card_header.addWidget(remove_button)
+
+        input_layout.addLayout(card_header)
+
+        # Editable study table
+        self.input_table = QTableWidget(4, 3)
+        self.input_table.setObjectName("bbInputTable")
+        self.input_table.setHorizontalHeaderLabels(
+            [
+                "Sample size (nᵢ)",
+                "Variable 1 events (xᵢ)",
+                "Variable 2 events (yᵢ)",
+            ]
+        )
+        self.input_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.input_table.verticalHeader().setVisible(False)
+        self.input_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.input_table.setAlternatingRowColors(True)
+        self.input_table.setItemDelegate(
+            CenteredItemDelegate(self.input_table)
+        )
+        self.input_table.setMinimumHeight(215)
+
+        input_layout.addWidget(self.input_table)
+
+        # Estimation settings
+        settings_layout = QHBoxLayout()
+
+        ci_label = QLabel("Confidence interval")
+        ci_label.setObjectName("bbFieldLabel")
+
+        self.ci_combo = QComboBox()
+        self.ci_combo.setObjectName("bbComboBox")
+        self.ci_combo.addItem("Likelihood-ratio", "lr")
+        self.ci_combo.addItem("Normal approximation", "normal")
+        self.ci_combo.addItem("None", "none")
+        self.ci_combo.setMinimumWidth(210)
+
+        settings_layout.addWidget(ci_label)
+        settings_layout.addWidget(self.ci_combo)
+        settings_layout.addStretch()
+
+        self.estimate_button = QPushButton("Estimate joint distribution")
+        self.estimate_button.setObjectName("bbPrimaryButton")
+        self.estimate_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.estimate_button.clicked.connect(self._preview_submission)
+
+        settings_layout.addWidget(self.estimate_button)
+
+        input_layout.addLayout(settings_layout)
+        outer_layout.addWidget(input_card)
+
+        # Results card
+        results_card = QFrame()
+        results_card.setObjectName("bbCard")
+
+        results_layout = QVBoxLayout(results_card)
+        results_layout.setContentsMargins(26, 22, 26, 22)
+        results_layout.setSpacing(8)
+
+        results_title = QLabel("Results")
+        results_title.setObjectName("bbCardTitle")
+
+        self.results_status = QLabel(
+            "Enter study-level summaries and run the estimator."
+        )
+        self.results_status.setObjectName("bbResultPlaceholder")
+        self.results_status.setWordWrap(True)
+        self.results_status.setMinimumHeight(90)
+        self.results_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        results_layout.addWidget(results_title)
+        results_layout.addWidget(self.results_status)
+
+        outer_layout.addWidget(results_card)
+        outer_layout.addStretch()
+
+        scroll_area.setWidget(content_widget)
+        page_layout.addWidget(scroll_area)
+
+    def _load_example(self) -> None:
+        """Populate the table with a small valid example."""
+        example_rows = [
+            (100, 58, 42),
+            (120, 68, 51),
+            (90, 49, 39),
+            (110, 65, 48),
+        ]
+
+        self.input_table.setRowCount(len(example_rows))
+
+        for row_index, values in enumerate(example_rows):
+            for column_index, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.input_table.setItem(row_index, column_index, item)
+
+        self.results_status.setText(
+            "Example data loaded. Click “Estimate joint distribution” "
+            "to validate the current inputs."
+        )
+
+    def _add_row(self) -> None:
+        """Add one empty study row."""
+        row_index = self.input_table.rowCount()
+        self.input_table.insertRow(row_index)
+
+    def _remove_selected_rows(self) -> None:
+        """Remove all currently selected rows."""
+        selected_rows = {
+            index.row() for index in self.input_table.selectedIndexes()
+        }
+
+        for row_index in sorted(selected_rows, reverse=True):
+            self.input_table.removeRow(row_index)
+
+        if self.input_table.rowCount() == 0:
+            self.input_table.insertRow(0)
+
+    def _collect_input_rows(self) -> list[tuple[int, int, int]]:
+        """Read and validate all non-empty rows."""
+        rows: list[tuple[int, int, int]] = []
+
+        for row_index in range(self.input_table.rowCount()):
+            raw_values = []
+
+            for column_index in range(3):
+                item = self.input_table.item(row_index, column_index)
+                value = item.text().strip() if item else ""
+                raw_values.append(value)
+
+            if all(value == "" for value in raw_values):
+                continue
+
+            if any(value == "" for value in raw_values):
+                raise ValueError(
+                    f"Row {row_index + 1} is incomplete. "
+                    "Fill all three cells or leave the entire row blank."
+                )
+
+            try:
+                n_i, x_i, y_i = (int(value) for value in raw_values)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Row {row_index + 1} must contain integer counts."
+                ) from exc
+
+            if n_i <= 0:
+                raise ValueError(
+                    f"Row {row_index + 1}: sample size must be positive."
+                )
+
+            if not 0 <= x_i <= n_i:
+                raise ValueError(
+                    f"Row {row_index + 1}: xᵢ must be between 0 and nᵢ."
+                )
+
+            if not 0 <= y_i <= n_i:
+                raise ValueError(
+                    f"Row {row_index + 1}: yᵢ must be between 0 and nᵢ."
+                )
+
+            rows.append((n_i, x_i, y_i))
+
+        if not rows:
+            raise ValueError("Enter at least one complete study row.")
+
+        return rows
+
+    def _preview_submission(self) -> None:
+        """Validate inputs, run the estimator, and display the results."""
+        try:
+            rows = self._collect_input_rows()
+
+            ni = [row[0] for row in rows]
+            xi = [row[1] for row in rows]
+            yi = [row[2] for row in rows]
+
+            ci_method = self.ci_combo.currentData()
+
+            self.results_status.setText("Running estimation...")
+            self.estimate_button.setEnabled(False)
+
+            result = estimate_binary_binary(
+                ni=ni,
+                xi=xi,
+                yi=yi,
+                ci_method=ci_method,
+            )
+
+        except (ValueError, RuntimeError) as error:
+            self.results_status.setText(
+                f"Estimation could not be completed.\n\n{error}"
+            )
+            QMessageBox.warning(
+                self,
+                "Estimation error",
+                str(error),
+            )
+            return
+
+        finally:
+            self.estimate_button.setEnabled(True)
+
+        if result.var_hat is None:
+            variance_text = "Not available"
+        else:
+            variance_text = f"{result.var_hat:.6f}"
+
+        if result.se_hat is None:
+            se_text = "Not available"
+        else:
+            se_text = f"{result.se_hat:.6f}"
+
+        if result.ci_lower is None or result.ci_upper is None:
+            ci_text = "Not requested"
+        else:
+            ci_text = (
+                f"[{result.ci_lower:.6f}, "
+                f"{result.ci_upper:.6f}]"
+            )
+
+        self.results_status.setText(
+            f"Estimation completed successfully.\n\n"
+            f"Number of studies: {len(rows)}\n"
+            f"Total sample size: {sum(ni):,}\n\n"
+            f"Marginal probability p₁:   {result.p1_hat:.6f}\n"
+            f"Marginal probability p₂:   {result.p2_hat:.6f}\n"
+            f"Joint probability p₁₁:      {result.p11_hat:.6f}\n"
+            f"Estimated variance:          {variance_text}\n"
+            f"Standard error:              {se_text}\n"
+            f"95% confidence interval:     {ci_text}"
+        )
+
+    def _apply_styles(self) -> None:
+        self.setStyleSheet(
+            """
+            QScrollArea#bbScrollArea {
+                border: none;
+                background: #ffffff;
+            }
+
+            QWidget#bbScrollContent {
+                background: #ffffff;
+            }
+
+            QLabel#bbPageTitle {
+                font-size: 29px;
+                font-weight: 650;
+                color: #202123;
+            }
+
+            QLabel#bbPageDescription {
+                font-size: 15px;
+                color: #666666;
+            }
+
+            QFrame#bbCard {
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+            }
+
+            QLabel#bbCardTitle {
+                font-size: 17px;
+                font-weight: 600;
+                color: #202123;
+            }
+
+            QLabel#bbMutedText {
+                font-size: 12px;
+                color: #7d7d7d;
+            }
+
+            QLabel#bbFieldLabel {
+                font-size: 13px;
+                font-weight: 550;
+                color: #383838;
+            }
+
+            QTableWidget#bbInputTable {
+                background: #ffffff;
+                alternate-background-color: #fafafa;
+                border: 1px solid #dddddd;
+                border-radius: 10px;
+                gridline-color: #eeeeee;
+                font-size: 13px;
+                selection-background-color: #e9e9eb;
+                selection-color: #202123;
+            }
+
+            QTableWidget#bbInputTable::item {
+                padding: 8px;
+            }
+
+            QHeaderView::section {
+                background: #f7f7f8;
+                color: #555555;
+                border: none;
+                border-bottom: 1px solid #dddddd;
+                padding: 9px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+
+            QPushButton#bbSecondaryButton {
+                min-height: 32px;
+                padding: 0 12px;
+                border: 1px solid #d8d8d8;
+                border-radius: 8px;
+                background: #ffffff;
+                color: #333333;
+                font-size: 12px;
+            }
+
+            QPushButton#bbSecondaryButton:hover {
+                background: #f3f3f3;
+            }
+
+            QComboBox#bbComboBox {
+                min-height: 34px;
+                padding: 0 34px 0 11px;
+                border: 1px solid #d8d8d8;
+                border-radius: 8px;
+                background: #ffffff;
+                font-size: 13px;
+            }
+
+            QComboBox#bbComboBox:hover {
+                border-color: #bdbdbd;
+            }
+
+            QComboBox#bbComboBox:focus {
+                border-color: #a8a8a8;
+            }
+
+            QComboBox#bbComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+                background: transparent;
+            }
+
+            QComboBox#bbComboBox::down-arrow {
+                width: 10px;
+                height: 10px;
+            }
+
+            QPushButton#bbPrimaryButton {
+                min-height: 36px;
+                padding: 0 18px;
+                border: none;
+                border-radius: 9px;
+                background: #202123;
+                color: #ffffff;
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            QPushButton#bbPrimaryButton:hover {
+                background: #343541;
+            }
+
+            QPushButton#bbPrimaryButton:pressed {
+                background: #111111;
+            }
+
+            QLabel#bbResultPlaceholder {
+                padding: 18px;
+                border: 1px dashed #d8d8d8;
+                border-radius: 10px;
+                background: #fafafa;
+                color: #777777;
+                font-size: 13px;
+            }
+            """
+        )
