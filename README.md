@@ -22,21 +22,21 @@ The application translates methods from the EBDM research project into a standal
 
 ![Binary–Continuous module](assets/screenshots/binary_continuous.png)
 
-## Current modules
+## 💥 Current modules
 
-### Binary–Binary
+### 1️⃣ Binary–Binary
 
 - Estimates marginal probabilities `p1` and `p2`
 - Estimates the joint probability `p11`
 - Reports variance, standard error, and normal or likelihood-ratio confidence intervals
 
-### Continuous–Continuous
+### 2️⃣ Continuous–Continuous
 
 - Proposed maximum-likelihood estimator
 - Weighted study-mean baseline
 - Reports marginal means, marginal standard deviations, correlation, standard error, and confidence interval
 
-### Binary–Continuous
+### 3️⃣ Binary–Continuous
 
 - Scaled generalized method of moments estimator
 - Naive likelihood estimator
