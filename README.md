@@ -4,6 +4,10 @@ A lightweight macOS desktop prototype for estimating joint distributions from st
 
 The application translates methods from the EBDM research project into a standalone Python/Qt interface. R is not required at runtime.
 
+## Download
+
+[**Download EBDM Desktop for macOS — Apple Silicon**](https://github.com/LongwenShang/EBDM-desktop/releases/latest/download/EBDM-Desktop-macOS-arm64.dmg)
+
 ## Screenshots
 
 ### Binary–Binary
